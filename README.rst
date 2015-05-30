@@ -7,7 +7,7 @@ datum.
 For applications that can share schema files, Avro datum provide small, contract
 based binary serialization format. Leveraging AMQP's ``Type`` message property
 to convey the Avro schema file for decoding the datum, the ``DatumConsumer``
-extends Rejected's ``rejected.consumer.SmartConsumer`` class adding automated
+extends Rejected's ``rejected.consumer.Consumer`` class adding automated
 deserialization of AMQP messages serialized as Avro datums.
 
 |Version| |Downloads| |License|
