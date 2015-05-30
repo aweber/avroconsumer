@@ -1,6 +1,6 @@
 from setuptools import setup
 
-classifiers = ['Development Status :: 4 - Production/Beta',
+classifiers = ['Development Status :: 4 - Beta',
                'Intended Audience :: Developers',
                'License :: OSI Approved :: BSD License',
                'Operating System :: OS Independent',
@@ -17,7 +17,7 @@ setup(name='avroconsumer',
       maintainer_email="gavinr@aweber.com",
       url="https://github.com/aweber/avroconsumer",
       install_requires=['rejected', 'avro'],
-      license=open('LICENSE').read(),
+      license='BSDv3',
       package_data={'': ['LICENSE', 'README.rst']},
       py_modules=['avroconsumer'],
       classifiers=classifiers)
