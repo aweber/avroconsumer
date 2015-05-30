@@ -22,9 +22,9 @@ To use the ``DatumConsumer``, first you need to set the ``schema_path`` configur
 setting in the rejected configuration file. The following snippet demonstrates
 an example configuration:
 
-```yaml
-Consumers:
+.. code:: yaml
 
+  Consumers:
     apns_push:
       consumer: app.Consumer
       connections: [rabbit1]
@@ -35,7 +35,6 @@ Consumers:
       max_errors: 5
       config:
         schema_path: /etc/avro-schemas/
-```
 
 If messages are published with a AMQP ``type`` message property of ``foo`` and
 a ``content-type`` property of ``application/vnd.apache.avro.datum``, the
@@ -43,15 +42,15 @@ a ``content-type`` property of ``application/vnd.apache.avro.datum``, the
 to deserialize messages
 
 The following example code shows how implement the ``DatumConsumer``.
-```python
-import avroconsumer
 
+.. code:: python
 
-class MyConsumer(avroconsumer.DatumConsumer):
+    import avroconsumer
 
-    def process(self):
-        LOGGER.debug('Decoded avro datum data: %r', self.body)
-```
+    class MyConsumer(avroconsumer.DatumConsumer):
+
+        def process(self):
+            LOGGER.debug('Decoded avro datum data: %r', self.body)
 
 As with any instance of ``rejected.consumer.Consumer``, the
 ``avroconsumer.DatumConsumer`` can automatically rejected messages based upon
@@ -59,17 +58,16 @@ the ``type`` message property. Simply set the ``MESSAGE_TYPE`` attribute
 of your consumer and any messages received that do not match that message type
 will be rejected. The following example demonstrates setting the message type:
 
-```python
-import avroconsumer
+.. code:: python
 
+    import avroconsumer
 
-class MyConsumer(avroconsumer.DatumConsumer):
+    class MyConsumer(avroconsumer.DatumConsumer):
 
-    MESSAGE_TYPE = 'foo'
+        MESSAGE_TYPE = 'foo'
 
-    def process(self):
-        LOGGER.debug('Decoded avro datum data: %r', self.body)
-```
+        def process(self):
+            LOGGER.debug('Decoded avro datum data: %r', self.body)
 
 Requirements
 ------------
