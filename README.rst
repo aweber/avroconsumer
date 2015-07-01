@@ -6,9 +6,10 @@ datum.
 
 For applications that can share schema files, Avro datum provide small, contract
 based binary serialization format. Leveraging AMQP's ``Type`` message property
-to convey the Avro schema file for decoding the datum, the ``DatumConsumer``
-extends Rejected's ``rejected.consumer.Consumer`` class adding automated
-deserialization of AMQP messages serialized as Avro datums.
+to convey the Avro schema file for decoding the datum, the ``DatumFileSchemaConsumer``
+and ``DatumConsulSchemaConsumer`` classes extend Rejected's
+``rejected.consumer.Consumer`` class adding automated deserialization of AMQP
+messages serialized as Avro datums.
 
 |Version| |Downloads| |License|
 
@@ -18,9 +19,12 @@ avroconsumer is available on the `Python package index <https://pypi.python.org/
 
 Usage
 -----
-To use the ``DatumConsumer``, first you need to set the ``schema_path`` configuration
-setting in the rejected configuration file. The following snippet demonstrates
-an example configuration:
+
+DatumFileSchemaConsumer
+```````````````````````
+To use the ``DatumFileSchemaConsumer``, first you need to set the ``schema_path``
+configuration setting in the rejected configuration file. The following snippet
+demonstrates an example configuration:
 
 .. code:: yaml
 
@@ -47,14 +51,14 @@ The following example code shows how implement the ``DatumConsumer``.
 
     import avroconsumer
 
-    class MyConsumer(avroconsumer.DatumConsumer):
+    class MyConsumer(avroconsumer.DatumFileSchemaConsumer):
 
         def process(self):
             LOGGER.debug('Decoded avro datum data: %r', self.body)
 
 As with any instance of ``rejected.consumer.Consumer``, the
-``avroconsumer.DatumConsumer`` can automatically rejected messages based upon
-the ``type`` message property. Simply set the ``MESSAGE_TYPE`` attribute
+``avroconsumer.DatumFileSchemaConsumer`` can automatically rejected messages
+based upon the ``type`` message property. Simply set the ``MESSAGE_TYPE`` attribute
 of your consumer and any messages received that do not match that message type
 will be rejected. The following example demonstrates setting the message type:
 
@@ -69,10 +73,23 @@ will be rejected. The following example demonstrates setting the message type:
         def process(self):
             LOGGER.debug('Decoded avro datum data: %r', self.body)
 
+DatumConsulSchemaConsumer
+`````````````````````````
+The ``avroconsumer.DatumConsulSchemaConsumer`` is an opinionated wrapper that
+loads versioned schema files from a `consul <http://consul.io>`_ Key/Value
+database. The schema files should be stored as keys in the format
+``/schemas/avro/<schema-name>/<schema-version>.avsc``. When messages are sent
+to consumers extending  ``avroconsumer.DatumConsulSchemaConsumer`` the AMQP `
+``type`` message property should be in ``<schema-name>.<schema-version>`` format.
+
+You can alter which Consul server is used to retrieve the schema by setting
+the ``CONSUL_HOST`` and ``CONSUL_PORT`` environment variables. They default
+to ``localhost`` and ``8500`` respectively.
+
 Requirements
 ------------
- - `avro <https://pypi.python.org/pypi/avro>`
- - `rejected <https://pypi.python.org/pypi/rejected>`
+ - `avro <https://pypi.python.org/pypi/avro>`_
+ - `rejected <https://pypi.python.org/pypi/rejected>`_
 
 .. |Version| image:: https://img.shields.io/pypi/v/avroconsumer.svg?
    :target: http://badge.fury.io/py/avroconsumer

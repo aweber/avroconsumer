@@ -3,31 +3,32 @@ Rejected Consumers for automatic deserialization (and serialization) of
 Avro datum in RabbitMQ messages.
 
 """
+import base64
 import json
+import logging
+import os
 from os import path
 import StringIO
+import warnings
 
 from rejected import consumer
 from avro import io
+from tornado import httpclient
 from avro import schema
+
+LOGGER = logging.getLogger(__name__)
 
 DATUM_MIME_TYPE = 'application/vnd.apache.avro.datum'
 
+__version__ = '0.2.0'
 
-class DatumConsumer(consumer.Consumer):
+
+class _DatumConsumer(consumer.Consumer):
     """Automatically deserialize Avro datum from RabbitMQ messages that have
     the ``content-type`` of ``application/vnd.apache.avro.datum``.
 
     """
     _schemas = dict()
-
-    def prepare(self):
-        """Ensure the schema_path is set in the settings"""
-        if self.settings.get('schema_path') is None:
-            raise consumer.ConsumerException('schema_path is not set')
-        if not path.exists(path.normpath(self.settings.schema_path)):
-            raise consumer.ConsumerException('schema_path is invalid')
-        super(DatumConsumer, self).initialize()
 
     @property
     def body(self):
@@ -76,6 +77,34 @@ class DatumConsumer(consumer.Consumer):
         return self._schemas[message_type]
 
     def _load_schema(self, message_type):
+        """Return the schema file as a str for the specified message_type.
+        This method must be implemented by child classes.
+
+        :param str message_type: The message type to load the schema for
+        :raises: NotImplementedError
+        :type: str
+
+        """
+        raise NotImplementedError
+
+
+class DatumFileSchemaConsumer(_DatumConsumer):
+    """Automatically deserialize Avro datum from RabbitMQ messages that have
+    the ``content-type`` of ``application/vnd.apache.avro.datum``. Schema
+    files are loaded from disk. The schema file path is comprised of the
+    ``schema_path`` configuration setting and the message type, appending the
+    file type ``.avsc`` to the the end.
+
+    """
+    def prepare(self):
+        """Ensure the schema_path is set in the settings"""
+        if self.settings.get('schema_path') is None:
+            raise consumer.ConsumerException('schema_path is not set')
+        if not path.exists(path.normpath(self.settings.schema_path)):
+            raise consumer.ConsumerException('schema_path is invalid')
+        super(DatumFileSchemaConsumer, self).prepare()
+
+    def _load_schema(self, message_type):
         """Load the schema file from the file system, raising a ``ValueError``
         if the the schema file can not be found. The schema file path is
         comprised of the ``schema_path`` configuration setting and the
@@ -94,3 +123,41 @@ class DatumConsumer(consumer.Consumer):
         message_schema = fp.read()
         fp.close()
         return message_schema
+
+
+class DatumConsumer(DatumFileSchemaConsumer):
+    """Deprecated clone of DatumFileSchemaConsumer for 0.1.0 compatibility"""
+    def prepare(self):
+        warnings.warn("Use DatumFileSchemaConsumer instead of DatumConsumer",
+                      DeprecationWarning)
+        super(DatumConsumer, self).prepare()
+
+
+class DatumConsulSchemaConsumer(_DatumConsumer):
+    """Automatically deserialize Avro datum from RabbitMQ messages that have
+    the ``content-type`` of ``application/vnd.apache.avro.datum``. Schema
+    files are loaded from Consul instead of from disk.
+
+    """
+    CONSUL_URL_FORMAT = 'http://{0}:{1}/v1/kv/schema/avro/{2}/{3}.avsc'
+
+    def _consul_url(self, schema_name):
+        consul_host = os.getenv('CONSUL_HOST', 'localhost')
+        consul_port = int(os.getenv('CONSUL_PORT', '8500'))
+        schema_type, schema_version = schema_name.split('.')
+        return self.CONSUL_URL_FORMAT.format(consul_host, consul_port,
+                                             schema_type, schema_version)
+
+    def _load_schema(self, message_type):
+        http_client = httpclient.HTTPClient()
+        url = self._consul_url(message_type)
+        LOGGER.debug('Loading schema for %s from %s', message_type, url)
+        print(url)
+        try:
+            response = http_client.fetch(url)
+        except httpclient.HTTPError as error:
+            LOGGER.error('Could not fetch Avro schema for %s (%s)',
+                         message_type, error)
+            raise consumer.ConsumerException('Error fetching avro scema')
+        data = json.loads(response.body)
+        return base64.b64decode(data[0]['Value'])
