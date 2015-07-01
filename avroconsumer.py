@@ -20,7 +20,7 @@ LOGGER = logging.getLogger(__name__)
 
 DATUM_MIME_TYPE = 'application/vnd.apache.avro.datum'
 
-__version__ = '0.2.0'
+__version__ = '0.3.0'
 
 
 class _DatumConsumer(consumer.Consumer):
@@ -43,8 +43,9 @@ class _DatumConsumer(consumer.Consumer):
             return self._message_body
 
         elif self.content_type == DATUM_MIME_TYPE:
-            schema = self._get_schema(self.message_type)
-            self._message_body = self._deserialize(schema, self._message.body)
+            schema_json = self._get_schema(self.message_type)
+            self._message_body = self._deserialize(schema_json,
+                                                   self._message.body)
         elif self.content_type.startswith('application/json'):
             self._message_body = json.loads(self._message.body)
         else:
@@ -53,17 +54,35 @@ class _DatumConsumer(consumer.Consumer):
         return self._message_body
 
     @staticmethod
-    def _deserialize(message_schema, data):
+    def _deserialize(avro_schema, data):
         """Deserialize an Avro datum with the specified schema string
 
-        :param str message_schema: The schema JSON snippet
+        :param str avro_schema: The schema JSON snippet
         :param str data: The Avro datum to deserialize
         :rtype: dict
 
         """
-        datum_reader = io.DatumReader(schema.parse(message_schema))
+        datum_reader = io.DatumReader(avro_schema)
         decoder = io.BinaryDecoder(StringIO.StringIO(data))
         return datum_reader.read(decoder)
+
+    @staticmethod
+    def _serialize(avro_schema, data):
+        """Serialize a data structure into an Avro datum
+
+        :param str savro_schema: The parsed Avro schema
+        :param dict data: The value to turn into an Avro datum
+        :rtype: str
+
+        """
+        str_io = StringIO.StringIO()
+        encoder = io.BinaryEncoder(str_io)
+        writer = io.DatumWriter(avro_schema)
+        try:
+            writer.write(data, encoder)
+        except io.AvroTypeException as error:
+            raise ValueError(error)
+        return str_io.getvalue()
 
     def _get_schema(self, message_type):
         """Fetch the Avro schema file from cache or the filesystem.
@@ -73,7 +92,8 @@ class _DatumConsumer(consumer.Consumer):
 
         """
         if message_type not in self._schemas:
-            self._schemas[message_type] = self._load_schema(message_type)
+            self._schemas[message_type] = \
+                schema.parse(self._load_schema(message_type))
         return self._schemas[message_type]
 
     def _load_schema(self, message_type):
@@ -144,7 +164,7 @@ class DatumConsulSchemaConsumer(_DatumConsumer):
     def _consul_url(self, schema_name):
         consul_host = os.getenv('CONSUL_HOST', 'localhost')
         consul_port = int(os.getenv('CONSUL_PORT', '8500'))
-        schema_type, schema_version = schema_name.split('.')
+        schema_type, schema_version = schema_name.rsplit('.', 1)
         return self.CONSUL_URL_FORMAT.format(consul_host, consul_port,
                                              schema_type, schema_version)
 
