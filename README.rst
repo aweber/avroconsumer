@@ -79,7 +79,7 @@ The ``avroconsumer.DatumConsulSchemaConsumer`` is an opinionated wrapper that
 loads versioned schema files from a `consul <http://consul.io>`_ Key/Value
 database. The schema files should be stored as keys in the format
 ``/schemas/avro/<schema-name>/<schema-version>.avsc``. When messages are sent
-to consumers extending  ``avroconsumer.DatumConsulSchemaConsumer`` the AMQP `
+to consumers extending  ``avroconsumer.DatumConsulSchemaConsumer`` the AMQP 
 ``type`` message property should be in ``<schema-name>.<schema-version>`` format.
 
 You can alter which Consul server is used to retrieve the schema by setting
