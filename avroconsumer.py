@@ -3,6 +3,7 @@ Rejected Consumers for automatic deserialization (and serialization) of
 Avro datum in RabbitMQ messages.
 
 """
+import bz2
 import base64
 import json
 import logging
@@ -10,6 +11,7 @@ import os
 from os import path
 import StringIO
 import warnings
+import zlib
 
 from rejected import consumer
 from avro import io
@@ -20,7 +22,7 @@ LOGGER = logging.getLogger(__name__)
 
 DATUM_MIME_TYPE = 'application/vnd.apache.avro.datum'
 
-__version__ = '0.3.0'
+__version__ = '0.3.1    '
 
 
 class _DatumConsumer(consumer.Consumer):
@@ -42,16 +44,40 @@ class _DatumConsumer(consumer.Consumer):
         if self._message_body:
             return self._message_body
 
-        elif self.content_type == DATUM_MIME_TYPE:
-            schema_json = self._get_schema(self.message_type)
-            self._message_body = self._deserialize(schema_json,
-                                                   self._message.body)
-        elif self.content_type.startswith('application/json'):
-            self._message_body = json.loads(self._message.body)
+        # Content Encoding decompression
+        elif self.content_encoding == 'bzip2':
+            self._message_body = self._decode_bz2(self._message.body)
+        elif self.content_encoding == 'gzip':
+            self._message_body = self._decode_gzip(self._message.body)
         else:
             self._message_body = self._message.body
 
+        if self.content_type == DATUM_MIME_TYPE:
+            schema_json = self._get_schema(self.message_type)
+            self._message_body = self._deserialize(schema_json,
+                                                   self._message_body)
+        elif self.content_type.startswith('application/json'):
+            self._message_body = json.loads(self._message_body)
+
         return self._message_body
+
+    @staticmethod
+    def _decode_bz2(value):
+        """Return a bz2 decompressed value
+
+        :param str value: Compressed value
+        :rtype: str
+        """
+        return bz2.decompress(value)
+
+    @staticmethod
+    def _decode_gzip(value):
+        """Return a zlib decompressed value
+
+        :param str value: Compressed value
+        :rtype: str
+        """
+        return zlib.decompress(value)
 
     @staticmethod
     def _deserialize(avro_schema, data):
