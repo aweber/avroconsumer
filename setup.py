@@ -11,7 +11,7 @@ classifiers = ['Development Status :: 4 - Beta',
                'Topic :: Software Development :: Libraries :: Python Modules']
 
 setup(name='avroconsumer',
-      version='0.3.1',
+      version='0.4.0',
       description="Simplified PostgreSQL client built upon Psycopg2",
       maintainer="Gavin M. Roy",
       maintainer_email="gavinr@aweber.com",
