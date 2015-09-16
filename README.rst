@@ -105,7 +105,7 @@ and if the field ``foo`` equals ``bar`` it will publish a ``bar`` message.
 .. code:: python
 
     class FooConsumer(avroconsumer.HTTPLoaderMixin,
-                      avroconsumer.DatumConsumer):
+                      avroconsumer.DatumPublishingConsumer):
 
         def process(self):
 
