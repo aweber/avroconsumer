@@ -14,18 +14,19 @@ import warnings
 import zlib
 
 from rejected import consumer
-from avro import io
 from tornado import httpclient
+
+from avro import io
 from avro import schema
 
 LOGGER = logging.getLogger(__name__)
 
 DATUM_MIME_TYPE = 'application/vnd.apache.avro.datum'
 
-__version__ = '0.4.0'
+__version__ = '0.5.0'
 
 
-class _DatumConsumer(consumer.Consumer):
+class DatumConsumer(consumer.Consumer):
     """Automatically deserialize Avro datum from RabbitMQ messages that have
     the ``content-type`` of ``application/vnd.apache.avro.datum``.
 
@@ -134,21 +135,49 @@ class _DatumConsumer(consumer.Consumer):
         raise NotImplementedError
 
 
-class DatumFileSchemaConsumer(_DatumConsumer):
-    """Automatically deserialize Avro datum from RabbitMQ messages that have
-    the ``content-type`` of ``application/vnd.apache.avro.datum``. Schema
-    files are loaded from disk. The schema file path is comprised of the
-    ``schema_path`` configuration setting and the message type, appending the
-    file type ``.avsc`` to the the end.
+class DatumPublishingConsumer(DatumConsumer,
+                              consumer.PublishingConsumer):
+    """The DatumPublishingConsumer wraps :py:class:`DatumConsumer` and
+    :py:class:`rejected.consumer.PublishingConsumer` to create a consumer
+    that publishes messages with Avro datum as the message body.
 
     """
-    def prepare(self):
+    def publish_message(self, msg_type, exchange, routing_key, properties,
+                        body):
+        """Publish an Avro-datum message
+
+        :param str msg_type: message type to publish.
+        :param str exchange: The exchange to publish to
+        :param str routing_key: The routing key to publish with
+        :param dict properties: The message properties
+        :param dict body: The message body that will be serialized as Avro
+
+        """
+        if properties is None:
+            properties = {}
+        properties.update({'content_type': DATUM_MIME_TYPE,
+                           'type': msg_type})
+
+        schema = self._get_schema(msg_type)
+        body = self._serialize(schema, body)
+        super(DatumPublishingConsumer, self).publish_message(exchange,
+                                                             routing_key,
+                                                             properties, body)
+
+
+class FileLoaderMixin(object):
+    """Mixin that loads schema files from disk. The schema file path is
+    comprised of the ``schema_path`` configuration setting and the
+    message type, appending the file type ``.avsc`` to the the end.
+
+    """
+    def initialize(self):
         """Ensure the schema_path is set in the settings"""
-        if self.settings.get('schema_path') is None:
+        if 'schema_path' not in settings:
             raise consumer.ConsumerException('schema_path is not set')
-        if not path.exists(path.normpath(self.settings.schema_path)):
+        if not path.exists(path.normpath(self.settings['schema_path'])):
             raise consumer.ConsumerException('schema_path is invalid')
-        super(DatumFileSchemaConsumer, self).prepare()
+        super(DatumFileSchemaConsumer, self).initialize()
 
     def _load_schema(self, message_type):
         """Load the schema file from the file system, raising a ``ValueError``
@@ -171,70 +200,60 @@ class DatumFileSchemaConsumer(_DatumConsumer):
         return message_schema
 
 
-class DatumConsumer(DatumFileSchemaConsumer):
-    """Deprecated clone of DatumFileSchemaConsumer for 0.1.0 compatibility"""
-    def prepare(self):
-        warnings.warn("Use DatumFileSchemaConsumer instead of DatumConsumer",
-                      DeprecationWarning)
-        super(DatumConsumer, self).prepare()
+class _HTTPLoaderMixin(object):
+    """Base HTTPLoader mixin that performs no validation and implements
+    a method for getting the URL to request.
+
+    """
+    def _schema_url(self, message_type):
+        raise NotImplemented
+
+    def _load_schema(self, message_type):
+        http_client = httpclient.HTTPClient()
+        url = self._schema_url(message_type)
+        LOGGER.debug('Loading schema for %s from %s', message_type, url)
+        try:
+            response = http_client.fetch(url)
+        except httpclient.HTTPError as error:
+            LOGGER.error('Could not fetch Avro schema for %s (%s)',
+                         message_type, error)
+            raise consumer.ConsumerException('Error fetching avro schema')
+        return response.body
 
 
-class DatumConsulSchemaConsumer(_DatumConsumer):
+class ConsulLoaderMixin(_HTTPLoaderMixin):
     """Automatically deserialize Avro datum from RabbitMQ messages that have
     the ``content-type`` of ``application/vnd.apache.avro.datum``. Schema
     files are loaded from Consul instead of from disk.
 
     """
-    CONSUL_URL_FORMAT = 'http://{0}:{1}/v1/kv/schema/avro/{2}/{3}.avsc'
+    CONSUL_URL_FORMAT = 'http://{0}:{1}/v1/kv/schema/avro/{2}/{3}.avsc?raw'
 
-    def _consul_url(self, schema_name):
+    def _schema_url(self, schema_name):
         consul_host = os.getenv('CONSUL_HOST', 'localhost')
         consul_port = int(os.getenv('CONSUL_PORT', '8500'))
         schema_type, schema_version = schema_name.rsplit('.', 1)
         return self.CONSUL_URL_FORMAT.format(consul_host, consul_port,
                                              schema_type, schema_version)
 
-    def _load_schema(self, message_type):
-        http_client = httpclient.HTTPClient()
-        url = self._consul_url(message_type)
-        LOGGER.debug('Loading schema for %s from %s', message_type, url)
-        print(url)
-        try:
-            response = http_client.fetch(url)
-        except httpclient.HTTPError as error:
-            LOGGER.error('Could not fetch Avro schema for %s (%s)',
-                         message_type, error)
-            raise consumer.ConsumerException('Error fetching avro scema')
-        data = json.loads(response.body)
-        return base64.b64decode(data[0]['Value'])
 
+class HTTPLoaderMixin(_HTTPLoaderMixin):
+    """Consumer class that implements Avro Datum decoding that loads Avro
+    schemas from a remote URI. The URI format for requests is configured
+    in the rejected configuration for the consumer with the
+    ``schema_uri_format`` parameter:
 
-class AvroPublishingConsumer(DatumConsulSchemaConsumer):
-    """The AvroPublishingConsumer extends the DatumConsulSchemaConsumer class,
-    adding the ability to publish avro message."""
+    .. code:: yaml
+        config:
+            schema uri_format: http://schema-server/avro/{0}.avsc
 
-    def publish_avro_message(self, msg_type, exchange, routing_key, properties,
-                             body):
-        """
-        Publish an Avro-encoded message.
+    The ``{0}`` value is the placeholder for the message type value.
 
-        :param str msg_type: message type to publish.
-        :param str exchange: The exchange to publish to
-        :param str routing_key: The routing key to publish with
-        :param dict properties: The message properties
-        :param str body: The message body
+    """
+    def initialize(self):
+        if 'schema_uri_format' not in self.settings:
+            raise consumer.ConsumerException('schema_uri_format is not set')
+        super(HTTPLoaderMixin, self).initialize()
 
-        """
-        schema = self._get_schema(msg_type)
-        avro_message = self._serialize(schema, body)
-
-        if properties is None:
-            properties = {}
-
-        properties.update({
-            'content_type': 'application/vnd.apache.avro.datum',
-            'type': msg_type,
-        })
-        LOGGER.debug('publishing %s message {CID %s}', msg_type,
-                     self._correlation_id)
-        self.publish_message(exchange, routing_key, properties, avro_message)
+    def _schema_url(self, message_type):
+        return self.settings['schema_uri_format'].format(message_type)
