@@ -174,9 +174,9 @@ class FileLoaderMixin(object):
     def initialize(self):
         """Ensure the schema_path is set in the settings"""
         if 'schema_path' not in settings:
-            raise consumer.ConsumerException('schema_path is not set')
+            raise ValueError('schema_path is not set in configuration')
         if not path.exists(path.normpath(self.settings['schema_path'])):
-            raise consumer.ConsumerException('schema_path is invalid')
+            raise ValueError('schema_path is invalid')
         super(DatumFileSchemaConsumer, self).initialize()
 
     def _load_schema(self, message_type):
@@ -252,7 +252,7 @@ class HTTPLoaderMixin(_HTTPLoaderMixin):
     """
     def initialize(self):
         if 'schema_uri_format' not in self.settings:
-            raise consumer.ConsumerException('schema_uri_format is not set')
+            raise ValueError('schema_uri_format is not set in configuration')
         super(HTTPLoaderMixin, self).initialize()
 
     def _schema_url(self, message_type):
