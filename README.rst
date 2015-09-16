@@ -86,6 +86,16 @@ You can alter which Consul server is used to retrieve the schema by setting
 the ``CONSUL_HOST`` and ``CONSUL_PORT`` environment variables. They default
 to ``localhost`` and ``8500`` respectively.
 
+AvroPublishingConsumer
+`````````````````````````
+The ``avroconsumer.AvroPublishingConsumer`` extends the
+``avroconsumer.DatumConsulSchemaConsumer`` class to allow the publishing of
+avro formatted events. Similar to the ``avroconsumer.DatumConsulSchemaConsumer``
+class, the schema files should be stored as keys in the format
+``/schemas/avro/<schema-name>/<schema-version>.avsc``. The ``publish_avro_message``
+method requires a param for the AMQP message type in
+``<schema-name>.<schema-version>`` format.
+
 Requirements
 ------------
  - `avro <https://pypi.python.org/pypi/avro>`_
