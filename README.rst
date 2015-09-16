@@ -65,6 +65,7 @@ rejected configuration file. The following snippet demonstrates an example
 configuration:
 
 .. code:: yaml
+
     Consumers:
       apns_push:
         consumer: app.Consumer
