@@ -114,7 +114,9 @@ and if the field ``foo`` equals ``bar`` it will publish a ``bar`` message.
                              {'timestamp': time.time()}, {'bar': True})
 
 
-.. note:: As with any instance of ``rejected.consumer.Consumer``, the
+Enforcing Message Type
+----------------------
+As with any instance of ``rejected.consumer.Consumer``, the
 ``avroconsumer.DatumConsumer`` can automatically rejected messages based upon the
 ``type`` message property. Simply set the ``MESSAGE_TYPE`` attribute of your
 consumer and any messages received that do not match that message type
