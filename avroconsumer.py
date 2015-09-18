@@ -23,7 +23,7 @@ LOGGER = logging.getLogger(__name__)
 
 DATUM_MIME_TYPE = 'application/vnd.apache.avro.datum'
 
-__version__ = '0.5.0'
+__version__ = '0.6.0'
 
 
 class DatumConsumer(consumer.Consumer):
@@ -142,11 +142,9 @@ class DatumPublishingConsumer(DatumConsumer,
     that publishes messages with Avro datum as the message body.
 
     """
-    def publish_message(self, msg_type, exchange, routing_key, properties,
-                        body):
+    def publish_message(self, exchange, routing_key, properties, body):
         """Publish an Avro-datum message
 
-        :param str msg_type: message type to publish.
         :param str exchange: The exchange to publish to
         :param str routing_key: The routing key to publish with
         :param dict properties: The message properties
@@ -155,11 +153,12 @@ class DatumPublishingConsumer(DatumConsumer,
         """
         if properties is None:
             properties = {}
-        properties.update({'content_type': DATUM_MIME_TYPE,
-                           'type': msg_type})
 
-        schema = self._get_schema(msg_type)
-        body = self._serialize(schema, body)
+        if properties.get('content_type') == DATUM_MIME_TYPE and \
+                properties.get('type'):
+            schema = self._get_schema(properties['type'])
+            body = self._serialize(schema, body)
+
         super(DatumPublishingConsumer, self).publish_message(exchange,
                                                              routing_key,
                                                              properties, body)
