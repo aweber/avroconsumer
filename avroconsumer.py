@@ -4,13 +4,11 @@ Avro datum in RabbitMQ messages.
 
 """
 import bz2
-import base64
 import json
 import logging
 import os
 from os import path
 import StringIO
-import warnings
 import zlib
 
 from rejected import consumer
@@ -23,7 +21,7 @@ LOGGER = logging.getLogger(__name__)
 
 DATUM_MIME_TYPE = 'application/vnd.apache.avro.datum'
 
-__version__ = '0.6.0'
+__version__ = '0.6.1'
 
 
 class DatumConsumer(consumer.Consumer):
@@ -172,11 +170,11 @@ class FileLoaderMixin(object):
     """
     def initialize(self):
         """Ensure the schema_path is set in the settings"""
-        if 'schema_path' not in settings:
+        if 'schema_path' not in self.settings:
             raise ValueError('schema_path is not set in configuration')
         if not path.exists(path.normpath(self.settings['schema_path'])):
             raise ValueError('schema_path is invalid')
-        super(DatumFileSchemaConsumer, self).initialize()
+        super(FileLoaderMixin, self).initialize()
 
     def _load_schema(self, message_type):
         """Load the schema file from the file system, raising a ``ValueError``
