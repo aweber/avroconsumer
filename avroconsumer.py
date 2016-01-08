@@ -53,8 +53,11 @@ class DatumConsumer(consumer.Consumer):
 
         if self.content_type == DATUM_MIME_TYPE:
             schema_json = self._get_schema(self.message_type)
-            self._message_body = self._deserialize(schema_json,
-                                                   self._message_body)
+            try:
+                self._message_body = self._deserialize(schema_json,
+                                                       self._message_body)
+            except UnicodeDecodeError:
+                raise consumer.MessageException('Error decoding avro message')
         elif self.content_type.startswith('application/json'):
             self._message_body = json.loads(self._message_body)
 
