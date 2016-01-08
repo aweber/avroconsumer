@@ -21,7 +21,7 @@ LOGGER = logging.getLogger(__name__)
 
 DATUM_MIME_TYPE = 'application/vnd.apache.avro.datum'
 
-__version__ = '0.6.1'
+__version__ = '0.6.2'
 
 
 class DatumConsumer(consumer.Consumer):

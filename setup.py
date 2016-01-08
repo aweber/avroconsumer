@@ -11,8 +11,8 @@ classifiers = ['Development Status :: 4 - Beta',
                'Topic :: Software Development :: Libraries :: Python Modules']
 
 setup(name='avroconsumer',
-      version='0.6.1',
-      description="Simplified PostgreSQL client built upon Psycopg2",
+      version='0.6.2',
+      description="Rejected consumer mixins for serializing and deserializing Avro datum",
       maintainer="Gavin M. Roy",
       maintainer_email="gavinr@aweber.com",
       url="https://github.com/aweber/avroconsumer",
