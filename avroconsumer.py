@@ -189,7 +189,7 @@ class FileLoaderMixin(object):
         :type: str
 
         """
-        file_path = path.normpath(path.join(self.settings.schema_path,
+        file_path = path.normpath(path.join(self.settings['schema_path'],
                                             '{0}.avsc'.format(message_type)))
         if not path.exists(file_path):
             raise ValueError('Missing schema file: {0}'.format(file_path))
