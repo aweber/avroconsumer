@@ -1,0 +1,12 @@
+{
+    "type": "record",
+    "namespace": "testing",
+    "name": "testing.user.schema",
+    "fields": [
+        {"name": "id", "type": "int"},
+        {"name": "firstname", "type": ["string", "null"]},
+        {"name": "lastname", "type": ["string", "null"]},
+        {"name": "email", "type": "string"},
+        {"name": "created_at", "type": "string"}
+    ]
+}

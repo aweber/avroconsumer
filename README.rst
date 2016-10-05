@@ -125,7 +125,7 @@ will be rejected.
 
 Requirements
 ------------
- - `avro <https://pypi.python.org/pypi/avro>`_
+ - `avro-python3 <https://pypi.python.org/pypi/avro-python3>`_ || `avro <https://pypi.python.org/pypi/avro>`_
  - `rejected <https://pypi.python.org/pypi/rejected>`_
 
 .. |Version| image:: https://img.shields.io/pypi/v/avroconsumer.svg?

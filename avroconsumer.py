@@ -4,18 +4,17 @@ Avro datum in RabbitMQ messages.
 
 """
 import bz2
+import io
 import json
 import logging
 import os
-from os import path
-import StringIO
 import zlib
 
 from rejected import consumer
 from tornado import httpclient
 
-from avro import io
-from avro import schema
+import avro.io
+import avro.schema
 
 LOGGER = logging.getLogger(__name__)
 
@@ -90,8 +89,8 @@ class DatumConsumer(consumer.Consumer):
         :rtype: dict
 
         """
-        datum_reader = io.DatumReader(avro_schema)
-        decoder = io.BinaryDecoder(StringIO.StringIO(data))
+        datum_reader = avro.io.DatumReader(avro_schema)
+        decoder = avro.io.BinaryDecoder(io.StringIO.StringIO(data))
         return datum_reader.read(decoder)
 
     @staticmethod
@@ -103,12 +102,12 @@ class DatumConsumer(consumer.Consumer):
         :rtype: str
 
         """
-        str_io = StringIO.StringIO()
-        encoder = io.BinaryEncoder(str_io)
-        writer = io.DatumWriter(avro_schema)
+        str_io = io.StringIO.StringIO()
+        encoder = avro.io.BinaryEncoder(str_io)
+        writer = avro.io.DatumWriter(avro_schema)
         try:
             writer.write(data, encoder)
-        except io.AvroTypeException as error:
+        except avro.io.AvroTypeException as error:
             raise ValueError(error)
         return str_io.getvalue()
 
@@ -121,7 +120,7 @@ class DatumConsumer(consumer.Consumer):
         """
         if message_type not in self._schemas:
             self._schemas[message_type] = \
-                schema.parse(self._load_schema(message_type))
+                avro.schema.parse(self._load_schema(message_type))
         return self._schemas[message_type]
 
     def _load_schema(self, message_type):
@@ -175,7 +174,7 @@ class FileLoaderMixin(object):
         """Ensure the schema_path is set in the settings"""
         if 'schema_path' not in self.settings:
             raise ValueError('schema_path is not set in configuration')
-        if not path.exists(path.normpath(self.settings['schema_path'])):
+        if not os.path.exists(os.path.normpath(self.settings['schema_path'])):
             raise ValueError('schema_path is invalid')
         super(FileLoaderMixin, self).initialize()
 
@@ -189,9 +188,9 @@ class FileLoaderMixin(object):
         :type: str
 
         """
-        file_path = path.normpath(path.join(self.settings['schema_path'],
+        file_path = os.path.normpath(os.path.join(self.settings['schema_path'],
                                             '{0}.avsc'.format(message_type)))
-        if not path.exists(file_path):
+        if not os.path.exists(file_path):
             raise ValueError('Missing schema file: {0}'.format(file_path))
 
         fp = open(file_path, 'r')
