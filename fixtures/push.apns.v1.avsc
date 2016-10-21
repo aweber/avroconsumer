@@ -1,0 +1,125 @@
+{
+    "type": "record",
+    "namespace": "com.aweber.rpc",
+    "name": "push.apns.v1",
+    "fields": [
+        {
+            "name": "device",
+            "type": "string"
+        },
+        {
+            "name": "aps",
+            "type": {
+                "name": "aps",
+                "type": "record",
+                "fields": [
+                    {
+                        "name": "alert",
+                        "type": [
+                            "null",
+                            {
+                                "name": "alert",
+                                "type": "record",
+                                "fields": [
+                                    {
+                                        "name": "title",
+                                        "type": [
+                                            "null",
+                                            "string"
+                                        ]
+                                    },
+                                    {
+                                        "name": "body",
+                                        "type": [
+                                            "null",
+                                            "string"
+                                        ]
+                                    },
+                                    {
+                                        "name": "title-loc-key",
+                                        "type": [
+                                            "null",
+                                            "string"
+                                        ]
+                                    },
+                                    {
+                                        "name": "title-loc-args",
+                                        "type": [
+                                            "null",
+                                            {
+                                                "type": "array",
+                                                "items": "string"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "action-loc-key",
+                                        "type": [
+                                            "null",
+                                            "string"
+                                        ]
+                                    },
+                                    {
+                                        "name": "loc-key",
+                                        "type": [
+                                            "null",
+                                            "string"
+                                        ]
+                                    },
+                                    {
+                                        "name": "loc-args",
+                                        "type": [
+                                            "null",
+                                            {
+                                                "type": "array",
+                                                "items": "string"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "launch-image",
+                                        "type": [
+                                            "null",
+                                            "string"
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "badge",
+                        "type": [
+                            "null",
+                            "int"
+                        ]
+                    },
+                    {
+                        "name": "sound",
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    {
+                        "name": "category",
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    {
+                        "name": "custom",
+                        "type": [
+                            "null",
+                            {
+                                "type": "map",
+                                "values": "string"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

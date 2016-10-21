@@ -1,0 +1,19 @@
+{
+  "device": "11e59dce5d2d4b53b638299a037575d311e59dce5d2d4b53b638299a037575d3",
+  "aps": {
+    "alert": {
+      "title": "Test Push Notification",
+      "title-loc-args": null,
+      "title-loc-key": null,
+      "body": "Example Test Notification",
+      "action-loc-key" : "Zoom",
+      "launch-image": null,
+      "loc-args": null,
+      "loc-key": null
+    },
+    "badge": 5,
+    "sound" : "chime.aiff",
+    "category":  "click",
+    "custom": null
+  }
+}
