@@ -12,7 +12,7 @@ after_success:
 deploy:
   distributions: sdist bdist_wheel
   provider: pypi
-  user: sprockets
+  user: crad
   on:
     python: 3.5
     tags: true
