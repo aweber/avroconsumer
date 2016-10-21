@@ -1,17 +1,14 @@
 avroconsumer
 ============
-An opinionated `Rejected consumer <https://github.com/gmr/rejected>`_ class that
-automatically decodes messages sent as `Avro <http://avro.apache.org/docs/1.7.7/>`_
-datum.
+A set of `Rejected`_ classes that automatically encode and decode AMQP
+message bodies as `Avro <http://avro.apache.org/docs/1.7.7/>`_ datums.
 
 For applications that can share schema files, Avro datum provide small, contract
 based binary serialization format. Leveraging AMQP's ``Type`` message property
-to convey the Avro schema file for decoding the datum, the ``DatumFileSchemaConsumer``
-and ``DatumConsulSchemaConsumer`` classes extend Rejected's
-``rejected.consumer.Consumer`` class adding automated deserialization of AMQP
-messages serialized as Avro datums.
+to convey the Avro schema file for decoding the datum, avroconsumer's classes
+extend Rejected's ``rejected.consumer.SmartPublishingConsumer``.
 
-|Version| |Downloads| |License|
+|Version| |Downloads| |License| |Status| |Coverage|
 
 Installation
 ------------
@@ -19,23 +16,17 @@ avroconsumer is available on the `Python package index <https://pypi.python.org/
 
 Usage
 -----
-avroconsumer has two base consumer types: ``DatumConsumer`` and
-``DatumPublishingConsumer``. As its name implies, the ``DatumPublishingConsumer``
-adds a method for publishing Avro datum as AMQP messages.
+avroconsumer has two base consumer types: ``LocalSchemaConsumer`` and
+``RemoteSchemaConsumer``. The difference between the two resides in how they
+load the Avro schema file. The ``LocalSchemaConsumer`` loads schema files from a
+local directory, while the ``RemoteSchemaConsumer`` loads schema files from a
+remote location accessible via HTTP.
 
-Both are consumer types are agnostic to how the Avro schema files are loaded and
-both require a mixin that performs the loading of the schema file. The package
-currently comes with three loader mixins:
-
-- ``FileLoaderMixin`` loads schema files from a local directory
-- ``HTTPLoaderMixin`` loads schema files from a remote directory exposed via HTTP
-- ``ConsulLoaderMixin`` loads schema files from a `Consul <http://consul.io>`_ Key/Value database
-
-FileLoaderMixin
-```````````````
-To use the ``FileLoaderMixin``, you need to set the ``schema_path`` config value
-in the consumer configuration of the rejected configuration file. The following
-snippet demonstrates an example configuration:
+LocalSchemaConsumer
+```````````````````
+To use the ``LocalSchemaConsumer``, you need to set the ``schema_path`` config
+value in the consumer configuration of the rejected configuration file. The
+following snippet demonstrates an example configuration:
 
 .. code:: yaml
 
@@ -54,13 +45,13 @@ snippet demonstrates an example configuration:
 In this example configuration, if messages are published with a AMQP ``type``
 message property of ``foo`` and a ``content-type`` property of
 ``application/vnd.apache.avro.datum``, classes extending the combination of
-``DatumConsumer`` and ``HTTPLoaderMixin`` will use the Avro schema file located
-at ``/etc/avro-schemas/foo.avsc`` to deserialize messages.
+``LocalSchemaConsumer`` will use the Avro schema file located at
+``/etc/avro-schemas/foo.avsc`` to deserialize messages.
 
-HTTPLoaderMixin
-```````````````
-The ``HTTPLoaderMixin`` loads schema files from a remote HTTP server. It expects
-a config setting of ``schema_uri_format`` in the consumer configuration of the
+RemoteSchemaConsumer
+````````````````````
+The ``RemoteSchemaConsumer`` loads schema files from a remote HTTP server. It
+expects the ``schema_uri_format`` setting in the consumer configuration of the
 rejected configuration file. The following snippet demonstrates an example
 configuration:
 
@@ -81,35 +72,23 @@ configuration:
 In this example configuration, if messages are published with a AMQP ``type``
 message property of ``foo`` and a ``content-type`` property of
 ``application/vnd.apache.avro.datum``, classes extending the combination of
-``DatumConsumer`` and ``HTTPLoaderMixin`` will use the Avro schema file located
+``RemoteSchemaConsumer`` will use the Avro schema file located
 at ``http://schema-server/avro/foo.avsc`` to deserialize messages.
-
-ConsulLoaderMixin
-`````````````````
-The ``ConsulLoaderMixin`` is opinionated and loads versioned schema files
-from a `consul <http://consul.io>`_ Key/Value database. The schema files should
-be stored with keys in the format ``/schemas/avro/<schema-name>/<schema-version>.avsc``.
-When messages are sent to consumers using the the combination of ``DatumConsumer``
-and ``ConsulLoaderMixin``,the AMQP ``type`` message property should be in
-``<schema-name>.<schema-version>`` format.
-
-You can alter which Consul server is used to retrieve the schema by setting
-the ``CONSUL_HOST`` and ``CONSUL_PORT`` environment variables. They default
-to ``localhost`` and ``8500`` respectively.
 
 Example
 -------
-The following example uses the ``DatumPublishingConsumer`` and ``HTTPLoaderMixin``
-to receive a message and deserialize it. It evaluates the content of the message
-and if the field ``foo`` equals ``bar`` it will publish a ``bar`` message.
+The following example uses the ``RemoteSchemaConsumer`` class to receive a
+message and deserialize it. It evaluates the content of the message and if the
+field ``foo`` equals ``bar`` it will publish a ``bar`` message.
 
 .. code:: python
 
-    class FooConsumer(avroconsumer.HTTPLoaderMixin,
-                      avroconsumer.DatumPublishingConsumer):
+    import avroconsumer
+
+
+    class FooConsumer(avroconsumer.RemoteSchemaConsumer):
 
         def process(self):
-
             if self.body['foo'] == 'bar':
                 self.publish('bar', 'amqp.direct', 'routing-key',
                              {'timestamp': time.time()}, {'bar': True})
@@ -117,22 +96,30 @@ and if the field ``foo`` equals ``bar`` it will publish a ``bar`` message.
 
 Enforcing Message Type
 ----------------------
-As with any instance of ``rejected.consumer.Consumer``, the
-``avroconsumer.DatumConsumer`` can automatically rejected messages based upon the
-``type`` message property. Simply set the ``MESSAGE_TYPE`` attribute of your
-consumer and any messages received that do not match that message type
-will be rejected.
+As with any instance of ``rejected.consumer.Consumer``, the avroconsumer classes
+can automatically rejected messages based upon the ``type`` message property.
+Simply set the ``MESSAGE_TYPE`` attribute of your consumer and any messages
+received that do not match that message type will be rejected.
 
 Requirements
 ------------
- - `avro <https://pypi.python.org/pypi/avro>`_
+ - `fastavro <https://pypi.python.org/pypi/fastavro>`_
  - `rejected <https://pypi.python.org/pypi/rejected>`_
 
+.. _Rejected: https://rejected.readthedocs.io/en/latest/
+
 .. |Version| image:: https://img.shields.io/pypi/v/avroconsumer.svg?
-   :target: http://badge.fury.io/py/avroconsumer
+   :target: https://pypi.python.org/pypi/avroconsumer
+
+.. |Status| image:: https://img.shields.io/travis/gmr/avroconsumer.svg?
+   :target: https://travis-ci.org/gmr/avroconsumer
+
+.. |Coverage| image:: https://img.shields.io/codecov/c/github/gmr/avroconsumer.svg?
+   :target: https://codecov.io/github/gmr/avroconsumer?branch=master
 
 .. |Downloads| image:: https://img.shields.io/pypi/dm/avroconsumer.svg?
    :target: https://pypi.python.org/pypi/avroconsumer
 
 .. |License| image:: https://img.shields.io/pypi/l/avroconsumer.svg?
-   :target: https://avroconsumer.readthedocs.org
+   :target: https://pypi.python.org/pypi/avroconsumer
+
