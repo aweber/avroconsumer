@@ -12,7 +12,7 @@ classifiers = ['Development Status :: 5 - Production/Stable',
                'Topic :: Software Development :: Libraries :: Python Modules']
 
 setup(name='avroconsumer',
-      version='1.0.0',
+      version='1.1.0',
       description='Base consumer class for working with Avro datums',
       maintainer='Gavin M. Roy',
       maintainer_email='gavinr@aweber.com',

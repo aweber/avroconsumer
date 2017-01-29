@@ -13,10 +13,10 @@ from tornado import httpclient
 
 DATUM_MIME_TYPE = 'application/vnd.apache.avro.datum'
 
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 
 
-class Consumer(consumer.SmartPublishingConsumer):
+class Consumer(consumer.SmartConsumer):
     """Automatically deserialize Avro datum from RabbitMQ messages that have
     the ``content-type`` of ``application/vnd.apache.avro.datum``.
 
@@ -44,8 +44,8 @@ class Consumer(consumer.SmartPublishingConsumer):
         return self._message_body
 
     def publish_message(self, exchange, routing_key, properties, body,
-                        no_serialization=False,
-                        no_encoding=False):
+                        no_serialization=False, no_encoding=False,
+                        channel=None):
         """Publish a message to RabbitMQ on the same channel the original
         message was received on.
 
@@ -70,8 +70,9 @@ class Consumer(consumer.SmartPublishingConsumer):
         :param str routing_key: The routing key to publish with
         :param dict properties: The message properties
         :param mixed body: The message body to publish
-        :param no_serialization: Turn off auto-serialization of the body
-        :param no_encoding: Turn off auto-encoding of the body
+        :param bool no_serialization: Turn off auto-serialization of the body
+        :param bool no_encoding: Turn off auto-encoding of the body
+        :param str channel: The channel to publish on
 
         """
         if properties is None:
@@ -83,7 +84,7 @@ class Consumer(consumer.SmartPublishingConsumer):
 
         super(Consumer, self).publish_message(
             exchange, routing_key, properties, body,
-            no_serialization, no_encoding)
+            no_serialization, no_encoding, channel)
 
     def _avro_schema(self, message_type):
         """Return the cached Avro schema for the specified message type.
