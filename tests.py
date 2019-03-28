@@ -1,11 +1,11 @@
 import json
 import unittest
 
-from tornado import concurrent, httpclient
 from helper import config
-from rejected import consumer, testing
 import mock
 from pika import spec
+from rejected import consumer, testing
+import responses
 
 import avroconsumer
 
@@ -50,7 +50,7 @@ class LocalSchemaConsumerTestCase(testing.AsyncTestCase):
     def test_decoded_body(self):
         yield self.process_message(
             self.avro_datum, avroconsumer.DATUM_MIME_TYPE,
-            'push.apns.v1', 'testing', 'push.apns')
+            'push.apns.v1', {}, 'testing', 'push.apns')
         self.assertDictEqual(self.consumer.body, self.json_data)
 
     @testing.gen_test
@@ -58,53 +58,50 @@ class LocalSchemaConsumerTestCase(testing.AsyncTestCase):
         with self.assertRaises(consumer.ConsumerException):
             yield self.process_message(
                 self.avro_datum, avroconsumer.DATUM_MIME_TYPE,
-                'push.apns.v2', 'testing', 'push.apns')
+                'push.apns.v2', {}, 'testing', 'push.apns')
 
     @testing.gen_test
     def test_json_content(self):
         yield self.process_message(
             json.dumps(self.json_data), 'application/json',
-            'push.apns.v1', 'testing', 'push.apns')
+            'push.apns.v1', {}, 'testing', 'push.apns')
         self.assertDictEqual(self.consumer.body, self.json_data)
 
-    @mock.patch('rejected.consumer.PublishingConsumer._get_pika_properties')
+    @mock.patch('rejected.consumer.Consumer._get_pika_properties')
     @testing.gen_test
     def test_publishing(self, get_properties):
         properties = spec.BasicProperties(
-                    content_type=avroconsumer.DATUM_MIME_TYPE,
-                    type='push.apns.v1')
+            content_type=avroconsumer.DATUM_MIME_TYPE,
+            type='push.apns.v1')
         get_properties.return_value = properties
-        # Force consumer cache of schema to flush
-        with mock.patch.object(self.consumer, '_channel') as channel:
-            channel.basic_publish = mock.Mock()
-            self.consumer.publish_message(
-                'foo', 'bar', {
-                    'content_type': avroconsumer.DATUM_MIME_TYPE,
-                    'type': 'push.apns.v1'},
-                self.json_data)
-            expectation = {
-                'body': self.avro_datum,
-                'exchange': 'foo',
-                'properties': properties,
-                'routing_key': 'bar'
-            }
-            channel.basic_publish.assert_called_once_with(**expectation)
 
-    @mock.patch('rejected.consumer.PublishingConsumer._get_pika_properties')
+        self.consumer.publish_message(
+            'foo', 'bar', {
+                'content_type': avroconsumer.DATUM_MIME_TYPE,
+                'type': 'push.apns.v1'
+            }, self.json_data)
+
+        expectation = {
+            'body': self.avro_datum,
+            'exchange': 'foo',
+            'properties': properties,
+            'routing_key': 'bar'
+        }
+        self.channel.basic_publish.assert_called_once_with(**expectation)
+
+    @mock.patch('rejected.consumer.Consumer._get_pika_properties')
     @testing.gen_test
     def test_publishing_passthrough(self, get_properties):
         properties = spec.BasicProperties()
         get_properties.return_value = properties
-        with mock.patch.object(self.consumer, '_channel') as channel:
-            channel.basic_publish = mock.Mock()
-            self.consumer.publish_message('foo', 'bar', None, 'test_value')
-            expectation = {
-                'body': 'test_value',
-                'exchange': 'foo',
-                'properties': properties,
-                'routing_key': 'bar'
-            }
-            channel.basic_publish.assert_called_once_with(**expectation)
+        self.consumer.publish_message('foo', 'bar', None, 'test_value')
+        expectation = {
+            'body': 'test_value',
+            'exchange': 'foo',
+            'properties': properties,
+            'routing_key': 'bar'
+        }
+        self.channel.basic_publish.assert_called_once_with(**expectation)
 
 
 class MisconfiguredLocalSchemaConsumerTestCase(unittest.TestCase):
@@ -135,6 +132,8 @@ class RemoteSchemaConsumerTestCase(testing.AsyncTestCase):
         super(RemoteSchemaConsumerTestCase, self).setUp()
         with open('./fixtures/push.apns.datum', 'rb') as handle:
             self.avro_datum = handle.read()
+        with open('./fixtures/push.apns.v1.avsc') as handle:
+            self.avro_schema = json.load(handle)
         with open('./fixtures/push.apns.json') as handle:
             self.json_data = json.load(handle)
         self.consumer._avro_schemas = {}
@@ -150,23 +149,27 @@ class RemoteSchemaConsumerTestCase(testing.AsyncTestCase):
             'schema_uri_format': 'http://localhost/schema/{}.avsc'
         }
 
-    @mock.patch('tornado.httpclient.HTTPClient.fetch')
     @testing.gen_test
-    def test_http_fetch_invoked(self, fetch):
-        future = concurrent.Future()
-        future.set_result(json.dumps(self.json_data))
-        fetch.return_value = future
-        yield self.process_message(
-            self.avro_datum, avroconsumer.DATUM_MIME_TYPE,
-            'push.apns.v1', 'testing', 'push.apns')
-        fetch.assert_called_once_with(
-            'http://localhost/schema/push.apns.v1.avsc')
-
-    @mock.patch('tornado.httpclient.HTTPClient.fetch')
-    @testing.gen_test
-    def test_http_error_raises_consumer_exception(self, fetch):
-        fetch.side_effect = httpclient.HTTPError(599, 'timeout')
-        with self.assertRaises(consumer.ConsumerException):
+    def test_requests_get_invoked(self):
+        with responses.RequestsMock() as rsps:
+            rsps.add(responses.GET,
+                     'http://localhost/schema/push.apns.v1.avsc',
+                     body=json.dumps(self.avro_schema), status=200,
+                     content_type='application/json')
             yield self.process_message(
                 self.avro_datum, avroconsumer.DATUM_MIME_TYPE,
-                'push.apns.v1', 'testing', 'push.apns')
+                'push.apns.v1', {}, 'testing', 'push.apns')
+            self.assertEqual(rsps.calls[0].request. url,
+                             'http://localhost/schema/push.apns.v1.avsc')
+
+    @testing.gen_test
+    def test_http_error_raises_consumer_exception(self):
+        with responses.RequestsMock() as rsps:
+            rsps.add(responses.GET,
+                     'http://localhost/schema/push.apns.v1.avsc',
+                     body='timeout', status=500,
+                     content_type='application/json')
+            with self.assertRaises(consumer.ConsumerException):
+                yield self.process_message(
+                    self.avro_datum, avroconsumer.DATUM_MIME_TYPE,
+                    'push.apns.v1', {}, 'testing', 'push.apns')

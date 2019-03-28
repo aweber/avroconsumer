@@ -1,12 +1,14 @@
 sudo: false
 language: python
+dist: xenial
 python:
- - 2.7
- - 3.4
- - 3.5
+  - 2.7
+  - 3.5
+  - 3.6
+  - 3.7
 install:
  - pip install -r requires/testing.txt
-script: nosetests --with-coverage
+script: nosetests
 after_success:
  - codecov
 deploy:
@@ -14,7 +16,7 @@ deploy:
   provider: pypi
   user: crad
   on:
-    python: 3.5
+    python: 3.7
     tags: true
     all_branches: true
   password:

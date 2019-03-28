@@ -1,2 +1,3 @@
-rejected>=3.16.0,<4
+rejected>=3.17.0,<4
 fastavro>=0.11.0,<1
+requests

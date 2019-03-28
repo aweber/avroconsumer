@@ -7,16 +7,16 @@ import io
 import json
 from os import path
 
-from rejected import consumer
 import fastavro
-from tornado import httpclient
+from rejected import consumer
+import requests
 
 DATUM_MIME_TYPE = 'application/vnd.apache.avro.datum'
 
-__version__ = '1.0.0'
+__version__ = '1.2.0'
 
 
-class Consumer(consumer.SmartPublishingConsumer):
+class Consumer(consumer.SmartConsumer):
     """Automatically deserialize Avro datum from RabbitMQ messages that have
     the ``content-type`` of ``application/vnd.apache.avro.datum``.
 
@@ -44,8 +44,8 @@ class Consumer(consumer.SmartPublishingConsumer):
         return self._message_body
 
     def publish_message(self, exchange, routing_key, properties, body,
-                        no_serialization=False,
-                        no_encoding=False):
+                        no_serialization=False, no_encoding=False,
+                        channel=None):
         """Publish a message to RabbitMQ on the same channel the original
         message was received on.
 
@@ -70,8 +70,9 @@ class Consumer(consumer.SmartPublishingConsumer):
         :param str routing_key: The routing key to publish with
         :param dict properties: The message properties
         :param mixed body: The message body to publish
-        :param no_serialization: Turn off auto-serialization of the body
-        :param no_encoding: Turn off auto-encoding of the body
+        :param bool no_serialization: Turn off auto-serialization of the body
+        :param bool no_encoding: Turn off auto-encoding of the body
+        :param str channel: The channel to publish on
 
         """
         if properties is None:
@@ -83,7 +84,7 @@ class Consumer(consumer.SmartPublishingConsumer):
 
         super(Consumer, self).publish_message(
             exchange, routing_key, properties, body,
-            no_serialization, no_encoding)
+            no_serialization, no_encoding, channel)
 
     def _avro_schema(self, message_type):
         """Return the cached Avro schema for the specified message type.
@@ -180,19 +181,16 @@ class RemoteSchemaConsumer(Consumer):
     ``schema_uri_format`` parameter:
 
     .. code:: yaml
+
         config:
             schema uri_format: http://schema-server/avro/{0}.avsc
 
     The ``{0}`` value is the placeholder for the message type value.
 
     """
-    def __init__(self, *args, **kwargs):
-        super(RemoteSchemaConsumer, self).__init__(*args, **kwargs)
-        self._avro_http_client = httpclient.HTTPClient(force_instance=True)
-
     def initialize(self):
-        self.require_setting('schema_uri_format',
-                             'avroconsumer.RemoteSchemaConsumer')
+        self.require_setting(
+            'schema_uri_format', 'avroconsumer.RemoteSchemaConsumer')
         super(RemoteSchemaConsumer, self).initialize()
 
     def _load_schema(self, message_type=None):
@@ -209,13 +207,12 @@ class RemoteSchemaConsumer(Consumer):
         message_type = message_type or self.message_type
         url = self._schema_url(message_type)
         self.logger.debug('Loading schema for %s from %s', message_type, url)
-        try:
-            response = self._avro_http_client.fetch(url)
-        except httpclient.HTTPError as error:
+        response = requests.get(url)
+        if not response.ok:
             self.logger.error('Could not fetch Avro schema for %s (%s)',
-                              message_type, error)
+                              message_type, response.status_code)
             raise consumer.ConsumerException('Error fetching avro schema')
-        return json.loads(response.body.decode('utf-8'))
+        return response.json()
 
     def _schema_url(self, message_type):
         return self.settings['schema_uri_format'].format(message_type)
